@@ -86,6 +86,6 @@ def main(page: ft.Page):
     page.on_route_change = lambda e: route_handler(e.route)
 
     # Define a rota inicial
-    page.go("/first")
+    page.go(page.route or "/")
 
 ft.app(target=main)
