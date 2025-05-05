@@ -1,91 +1,37 @@
 import flet as ft
+import httpx
 
-def first_view():
-    return ft.Container(
-        content=ft.Text("Você está na página First"),
-        expand=True,
-    )
-
-def second_view():
-    return ft.Container(
-        content=ft.Text("Você está na página Second"),
-        expand=True,
-    )
-
-def settings_view():
-    return ft.Container(
-        content=ft.Text("Você está na página Settings"),
-        expand=True,
-    )
+API_URL = "http://localhost:8000"
 
 def main(page: ft.Page):
-    page.window.width = 800
-    page.window.height = 600
-    page.window.maximizable = False
-    page.window.resizable = False
-    page.theme_mode = ft.ThemeMode.SYSTEM
-    page.scroll = ft.ScrollMode.ADAPTIVE
+    page.title = "Cadastro de Clientes"
+    nome = ft.TextField(label="Nome")
+    email = ft.TextField(label="Email")
+    clientes_list = ft.Column()
 
-    views = {
-        "/first": first_view,
-        "/second": second_view,
-        "/settings": settings_view,
-    }
+    async def listar():
+        clientes_list.controls.clear()
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{API_URL}/clientes")
+            for c in resp.json():
+                clientes_list.controls.append(
+                    ft.Row([
+                        ft.Text(f"{c['id']} - {c['nome']} - {c['email']}"),
+                        ft.IconButton(icon=ft.icons.DELETE, on_click=lambda e, cid=c['id']: deletar(cid))
+                    ])
+                )
+            await page.update_async()
 
-    # Gera a lista de rotas dinamicamente
-    routes = list(views.keys())
+    async def adicionar(e):
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{API_URL}/clientes", json={"nome": nome.value, "email": email.value})
+        await listar()
 
-    def route_handler(route):
-        page.views.clear()
+    async def deletar(id):
+        async with httpx.AsyncClient() as client:
+            await client.delete(f"{API_URL}/clientes/{id}")
+        await listar()
 
-        # Obtém a view correspondente à rota atual ou exibe "Página não encontrada"
-        content = views.get(route, lambda: ft.Container(content=ft.Text("Página não encontrada"), expand=True))()
-
-        # Adiciona a nova view com o NavigationRail
-        page.views.append(
-            ft.View(
-                route=route,
-                controls=[
-                    ft.Row(
-                        [
-                            ft.NavigationRail(
-                                selected_index=routes.index(route) if route in routes else 0,
-                                label_type=ft.NavigationRailLabelType.ALL,
-                                destinations=[
-                                    ft.NavigationRailDestination(
-                                        icon=ft.Icons.HOME_OUTLINED,
-                                        selected_icon=ft.Icons.HOME,
-                                        label="Home",
-                                        padding=ft.padding.only(0, 10, 0, 10)
-                                    ),
-                                    ft.NavigationRailDestination(
-                                        icon=ft.Icons.BOOKMARK_BORDER,
-                                        selected_icon=ft.Icons.BOOKMARK,
-                                        label="Saveds",
-                                    ),                                    
-                                    ft.NavigationRailDestination(
-                                        icon=ft.Icons.SETTINGS_OUTLINED,
-                                        selected_icon=ft.Icons.SETTINGS,
-                                        label="Settings",
-                                        padding=ft.padding.only(0, 320, 0, 0)
-                                    ),
-                                ],
-                                on_change=lambda e: page.go(routes[e.control.selected_index]),
-                            ),
-                            ft.VerticalDivider(width=1),
-                            content,  # Adiciona o conteúdo da view
-                        ],
-                        expand=True,
-                    )
-                ],
-            )
-        )
-        page.update()
-
-    # Configura o evento de mudança de rota
-    page.on_route_change = lambda e: route_handler(e.route)
-
-    # Define a rota inicial
-    page.go(page.route or "/")
-
-ft.app(target=main)
+    btn_add = ft.ElevatedButton("Adicionar", on_click=adicionar)
+    page.add(nome, email, btn_add, ft.Divider(), clientes_list)
+    page.on_load = lambda _: listar()

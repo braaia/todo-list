@@ -1,15 +1,12 @@
 from fastapi import FastAPI, HTTPException
-from fastapi import Lifespan
 from .schemas import ClienteIn, ClienteOut
 from . import models, database
 
 app = FastAPI()
 
-def lifespan(app: FastAPI) -> Lifespan:
-    async def startup():
-        database.init_db()
-
-    return {"startup": startup}
+@app.on_event("startup")
+def startup():
+    database.init_db()
 
 @app.post("/clientes", response_model=ClienteOut)
 def criar(cliente: ClienteIn):
